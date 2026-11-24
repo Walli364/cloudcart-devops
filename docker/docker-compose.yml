@@ -1,0 +1,25 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cloudcart-redis
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: cloudcart-backend
+    environment:
+      - REDIS_HOST=redis
+      - APP_ENV=docker-local
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    container_name: cloudcart-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend

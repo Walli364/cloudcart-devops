@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudCart | DevOps Microservices Demo</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 2rem; }
+        .container { max-width: 900px; margin: auto; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 1rem; margin-bottom: 2rem; }
+        .badge { background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; padding: 0.3rem 0.7rem; border-radius: 6px; font-size: 0.85rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .card { background: #1e293b; padding: 1.2rem; border-radius: 10px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between; }
+        .card h3 { margin: 0 0 0.5rem 0; font-size: 1.05rem; }
+        .price { color: #34d399; font-weight: bold; font-size: 1.2rem; margin-bottom: 1rem; }
+        button { background: #2563eb; color: white; border: none; padding: 0.6rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #1d4ed8; }
+        .btn-danger { background: #dc2626; margin-left: 0.5rem; }
+        .btn-danger:hover { background: #b91c1c; }
+        .orders-box { background: #1e293b; padding: 1.2rem; border-radius: 10px; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { text-align: left; padding: 0.6rem; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div>
+            <h1 style="margin:0;">CloudCart Store</h1>
+            <small style="color:#94a3b8;">GitOps + Observability Microservices Stack</small>
+        </div>
+        <div>
+            <span class="badge" id="pod-info">Pod: loading...</span>
+            <button class="btn-danger" onclick="triggerError()">Simulate 500 Error</button>
+        </div>
+    </header>
+
+    <h2>Products</h2>
+    <div class="grid" id="products-grid"></div>
+
+    <div class="orders-box">
+        <h2 style="margin-top:0;">Recent Orders (Stored in Redis)</h2>
+        <table>
+            <thead>
+                <tr><th>Order ID</th><th>Product</th><th>Qty</th><th>Total</th><th>Time</th></tr>
+            </thead>
+            <tbody id="orders-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function loadInfo() {
+        try {
+            const res = await fetch('/api/info');
+            const data = await res.json();
+            document.getElementById('pod-info').innerText = `Env: ${data.environment} | Pod: ${data.hostname}`;
+        } catch (e) {
+            document.getElementById('pod-info').innerText = 'Backend Offline';
+        }
+    }
+
+    async function loadProducts() {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        const grid = document.getElementById('products-grid');
+        grid.innerHTML = data.products.map(p => `
+            <div class="card">
+                <div>
+                    <h3>${p.name}</h3>
+                    <div class="price">$${p.price}</div>
+                </div>
+                <button onclick="buyProduct(${p.id})">Order Now</button>
+            </div>
+        `).join('');
+    }
+
+    async function buyProduct(id) {
+        await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product_id: id, quantity: 1 })
+        });
+        loadOrders();
+    }
+
+    async function loadOrders() {
+        const res = await fetch('/api/orders');
+        const data = await res.json();
+        const tbody = document.getElementById('orders-body');
+        tbody.innerHTML = (data.orders || []).map(o => `
+            <tr>
+                <td>#${o.order_id}</td>
+                <td>${o.product}</td>
+                <td>${o.quantity}</td>
+                <td>$${o.total_price}</td>
+                <td>${o.timestamp}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function triggerError() {
+        await fetch('/api/simulate-error');
+        alert('500 Error triggered! Check Prometheus/Grafana metrics.');
+    }
+
+    loadInfo();
+    loadProducts();
+    loadOrders();
+</script>
+</body>
+</html>
